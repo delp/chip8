@@ -1,0 +1,81 @@
+package chip8
+
+var Fontset = []uint8{
+	0xF0, 0x90, 0x90, 0x90, 0xF0, //0
+	0x20, 0x60, 0x20, 0x20, 0x70, //1
+	0xF0, 0x10, 0xF0, 0x80, 0xF0, //2
+	0xF0, 0x10, 0xF0, 0x10, 0xF0, //3
+	0x90, 0x90, 0xF0, 0x10, 0x10, //4
+	0xF0, 0x80, 0xF0, 0x10, 0xF0, //5
+	0xF0, 0x80, 0xF0, 0x90, 0xF0, //6
+	0xF0, 0x10, 0x20, 0x40, 0x40, //7
+	0xF0, 0x90, 0xF0, 0x90, 0xF0, //8
+	0xF0, 0x90, 0xF0, 0x10, 0xF0, //9
+	0xF0, 0x90, 0xF0, 0x90, 0x90, //A
+	0xE0, 0x90, 0xE0, 0x90, 0xE0, //B
+	0xF0, 0x80, 0x80, 0x80, 0xF0, //C
+	0xE0, 0x90, 0x90, 0x90, 0xE0, //D
+	0xF0, 0x80, 0xF0, 0x80, 0xF0, //E
+	0xF0, 0x80, 0xF0, 0x80, 0x80, //F
+}
+
+type Chip8 struct {
+	Stack [16]uint16
+	Sp    uint8
+
+	Memory [4096]uint8
+	V      [16]uint8 //V registers (V0-VF)
+
+	Pc     uint16
+	Opcode uint16
+	I      uint16 //Index Register
+
+	DelayTimer uint8
+	SoundTimer uint8
+
+	Gfx [64 * 32]uint8
+	Key [16]uint8
+}
+
+func (c *Chip8) EmulateCycle() {
+	//do a cycle brah brah
+	// Fetch Opcode
+	// Decode Opcode
+	// Execute Opcode
+
+	// Update timers
+}
+
+func (c *Chip8) Init() {
+	c.Pc = 0x200 // Program counter starts at 0x200
+	c.Opcode = 0 // Reset current opcode
+	c.I = 0      // Reset index register
+	c.Sp = 0     // Reset stack pointer
+
+	// Clear display
+	for i := 0; i < 2048; i++ {
+		c.Gfx[i] = 0
+
+	}
+
+	// Clear stack, keys, regs
+	for i := 0; i < 16; i++ {
+		c.Stack[i] = 0
+		c.Key[i] = 0
+		c.V[i] = 0
+	}
+
+	// Clear Memory
+	for i := 0; i < 4096; i++ {
+		c.Memory[i] = 0
+	}
+
+	// Load fontset
+	for i := 0; i < 80; i++ {
+		c.Memory[i] = Fontset[i]
+	}
+
+	// Reset timers
+	c.DelayTimer = 0
+	c.SoundTimer = 0
+}
