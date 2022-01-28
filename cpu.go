@@ -198,9 +198,51 @@ func (c *Chip8) EmulateCycle() {
 			*/
 
 		case 0x05:
+			//8XY5 sets VX = VX - VY
+			overflow := false
+			if c.V[X] > c.V[Y] {
+				overflow = true
+			}
+
+			underflow := false
+			if c.V[Y] > c.V[X] {
+				underflow = true
+			}
+
+			c.V[X] = c.V[X] - c.V[Y]
+
+			if overflow {
+				c.V[0xF] = 1
+			}
+			if underflow {
+				c.V[0xF] = 0
+			}
 
 		case 0x07:
+			//8XY5 sets VX = *VY* - VX
 
+			overflow := false
+			if c.V[Y] > c.V[X] {
+				overflow = true
+			}
+
+			underflow := false
+			if c.V[X] > c.V[Y] {
+				underflow = true
+			}
+
+			c.V[X] = c.V[Y] - c.V[X]
+
+			if overflow {
+				c.V[0xF] = 1
+			}
+			if underflow {
+				c.V[0xF] = 0
+			}
+
+		case 0x06:
+
+		case 0x0E:
 		}
 
 	case 0x90:
