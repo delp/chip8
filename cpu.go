@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"math"
 	"math/rand"
 	"time"
 )
@@ -337,32 +338,41 @@ func (c *Chip8) EmulateCycle() {
 			//For each of the 8 pixels/bits in this sprite row:
 			//TODO  //If you reach the right edge of the screen, stop drawing this row
 
-			// 0 0x80
-			// 1 0x40
-			// 2 0x20
-			// 3 0x10
-			// 4 0x08
-			// 5 0x04
-			// 6 0x02
-			// 7 0x01
+			// 0 0x80 2^7
+			// 1 0x40 2^6
+			// 2 0x20 2^5
+			// 3 0x10 2^4
+			// 4 0x08 2^3
+			// 5 0x04 2^2
+			// 6 0x02 2^1
+			// 7 0x01 2^0
 
-			bit0 := spriteByte & 0x80
-			if bit0 == 1 {
-				//If the current pixel in the sprite row is on and the pixel at coordinates X,Y on the screen is also on, turn off the pixel and set VF to 1
-				index := GetScreenIndexFromCoords(int(xcoord+0), int(ycoord))
-				if c.Gfx[index] == 1 {
-					c.Gfx[index] = 0
-					c.V[0x0F] = 1
+			for j := 1; j <= 8; j++ {
 
-					//Or if the current pixel in the sprite row is on and
-					//the screen pixel is not, draw the pixel at the X and Y
-					//coordinates
-				} else {
-					c.Gfx[index] = 1
+				if xcoord+uint8(j-1) >= 63 {
+					break
 				}
+				expo := 8 - j
+				power := math.Pow(2, float64(expo))
+				mask := uint8(power)
+				bit := spriteByte & mask
+				if bit > 0 {
+					//If the current pixel in the sprite row is on and the pixel at coordinates X,Y on the screen is also on, turn off the pixel and set VF to 1
+					index := GetScreenIndexFromCoords(int(xcoord+uint8(j)), int(ycoord))
+					if c.Gfx[index] == 1 {
+						c.Gfx[index] = 0
+						c.V[0x0F] = 1
 
-				// Increment X (VX is not incremented)
+						//Or if the current pixel in the sprite row is on and
+						//the screen pixel is not, draw the pixel at the X and Y
+						//coordinates
+					} else {
+						c.Gfx[index] = 1
+					}
 
+					// Increment X (VX is not incremented)
+
+				}
 			}
 			// Increment Y (VY is not incremented)
 			// Stop if you reach the bottom edge of the screen
@@ -567,5 +577,4 @@ func main() {
 		cpu.EmulateCycle()
 	}
 
-	//copy to memory
 }
