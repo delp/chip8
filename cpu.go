@@ -337,7 +337,16 @@ func (c *Chip8) EmulateCycle() {
 			//For each of the 8 pixels/bits in this sprite row:
 			//TODO  //If you reach the right edge of the screen, stop drawing this row
 
-			bit0 := spriteByte & 0x10
+			// 0 0x80
+			// 1 0x40
+			// 2 0x20
+			// 3 0x10
+			// 4 0x08
+			// 5 0x04
+			// 6 0x02
+			// 7 0x01
+
+			bit0 := spriteByte & 0x80
 			if bit0 == 1 {
 				//If the current pixel in the sprite row is on and the pixel at coordinates X,Y on the screen is also on, turn off the pixel and set VF to 1
 				index := GetScreenIndexFromCoords(int(xcoord+0), int(ycoord))
@@ -345,16 +354,18 @@ func (c *Chip8) EmulateCycle() {
 					c.Gfx[index] = 0
 					c.V[0x0F] = 1
 
-					//Or if the current pixel in the sprite row is on and the screen pixel is not, draw the pixel at the X and Y coordinates
+					//Or if the current pixel in the sprite row is on and
+					//the screen pixel is not, draw the pixel at the X and Y
+					//coordinates
 				} else {
 					c.Gfx[index] = 1
 				}
 
-			}
+				// Increment X (VX is not incremented)
 
-			// Increment X (VX is not incremented)
+			}
 			// Increment Y (VY is not incremented)
-			//  Stop if you reach the bottom edge of the screen
+			// Stop if you reach the bottom edge of the screen
 
 		}
 
@@ -557,5 +568,4 @@ func main() {
 	}
 
 	//copy to memory
-
 }
