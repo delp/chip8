@@ -1,6 +1,11 @@
-package chip8
+package main
 
-import "fmt"
+import (
+	"fmt"
+	"io/ioutil"
+	"math/rand"
+	"time"
+)
 
 var Fontset = []uint8{
 	0xF0, 0x90, 0x90, 0x90, 0xF0, //0
@@ -23,33 +28,36 @@ var Fontset = []uint8{
 
 type Chip8 struct {
 	Stack [16]uint16
-	Sp    uint8
+	Sp    uint8 //Stack Pointer
 
 	Memory [4096]uint8
 	V      [16]uint8 //V registers (V0-VF)
 
-	Pc uint16
+	Pc uint16 //Program Counter
 
-	//TODO remove this?? v
-	Opcode uint16
-	I      uint16 //Index Register
+	I uint16 //Index Register
 
 	DelayTimer uint8
 	SoundTimer uint8
 
 	Gfx [64 * 32]uint8
-	Key [16]uint8
+	//64 pixels wide and 32 pixels tall
+	Key [16]uint8 //Memory Mapped Keyboard
 }
 
-/* info
-//TODO
-"The first CHIP-8 interpreter (on the COSMAC VIP computer) was also
-located in RAM, from address 000 to 1FF. It would expect a CHIP-8
-program to be loaded into memory after it, starting at address 200
-(512 in decimal). Although modern interpreters are not in the same
-memory space, you should do the same to be able to run the old programs;
-you can just leave the initial space empty, except for the font."
-*/
+func GetCoordsFromScreenIndex(i int) (int, int) {
+
+	y := (i / 64) + 1
+
+	x := i - ((y - 1) * 64)
+	x++
+
+	return x, y
+}
+
+func GetScreenIndexFromCoords(x int, y int) int {
+	return (x - 1) + (y-1)*64
+}
 
 func (c *Chip8) EmulateCycle() {
 
@@ -76,17 +84,24 @@ func (c *Chip8) EmulateCycle() {
 	    NNN: The second, third and fourth nibbles. A 12-bit immediate memory address."
 	*/
 
-	nib1 := opcode & 0xF000
-	X := opcode & 0x0F00
-	Y := opcode & 0x00F0
+	//nib1
+	foo := opcode & 0xF000
+	foo = foo >> 8
+	nib1 := uint8(foo)
+
+	//X
+	foo = opcode & 0x0F00
+	foo = foo >> 8
+	X := uint8(foo)
+
+	//Y
+	foo = opcode & 0x00F0
+	foo = foo >> 4
+	Y := uint8(foo)
+
 	N := opcode & 0x000F
 	NN := uint8(opcode & 0x00FF)
 	NNN := opcode & 0x0FFF
-	fmt.Println(X)
-	fmt.Println(Y)
-	fmt.Println(N)
-	fmt.Println(NN)
-	fmt.Println(NNN)
 
 	switch nib1 {
 	case 0x00:
@@ -240,9 +255,40 @@ func (c *Chip8) EmulateCycle() {
 				c.V[0xF] = 0
 			}
 
+			/*
+				Step by step:
+				(Optional, or configurable) Set VX to the value of VY
+				Shift the value of VX one bit to the right (8XY6) or left (8XYE)
+				Set VF to 1 if the bit that was shifted out was 1, or 0 if it was 0
+			*/
 		case 0x06:
+			//8XY6 shift right
+			c.V[X] = c.V[Y]
+
+			foo := c.V[X] & 0x01
+
+			c.V[X] = c.V[X] >> 1
+
+			if foo == 0x01 {
+				c.V[0x0F] = 1
+			} else {
+				c.V[0x0F] = 0
+			}
 
 		case 0x0E:
+			//8XYE shift left
+
+			c.V[X] = c.V[Y]
+
+			foo := c.V[X] & 0x80
+
+			c.V[X] = c.V[X] << 1
+
+			if foo == 0x80 {
+				c.V[0x0F] = 1
+			} else {
+				c.V[0x0F] = 0
+			}
 		}
 
 	case 0x90:
@@ -250,7 +296,183 @@ func (c *Chip8) EmulateCycle() {
 		if c.V[X] != c.V[Y] {
 			c.Pc += 0x02
 		}
+
+	case 0xA0:
+		//ANNN
+		//set index register to NNN
+
+		c.I = NNN
+
+	case 0xB0:
+		//BNNN jump with offset. ambiguous and not commonly used
+		//jump to NNN plus value of V0
+		destination := NNN + uint16(c.V[0])
+		c.Pc = destination
+
+	case 0xC0:
+		//CXNN VX = random number & VX
+		s1 := rand.NewSource(time.Now().UnixNano())
+		r1 := rand.New(s1)
+		random := uint8(r1.Intn(255))
+		c.V[X] = c.V[X] & random
+
+	case 0xD0:
+		//TODO
+		//DXYN display crap
+
+		/*
+		   Set the X coordinate to the value in VX modulo 64 (or, equivalently, VX & 63, where & is the binary AND operation)
+		   Set the Y coordinate to the value in VY modulo 32 (or VY & 31)
+		   Set VF to 0
+		*/
+		xcoord := c.V[X] & 63
+		ycoord := c.V[Y] & 31
+		c.V[0x0F] = 0
+
+		//For N rows:
+		for i := uint16(0x00); i < N; i++ {
+			//Get the Nth byte of sprite data, counting from the memory address in the I register (I is not incremented)
+			spriteByte := c.Memory[c.I+N]
+
+			//For each of the 8 pixels/bits in this sprite row:
+			//TODO  //If you reach the right edge of the screen, stop drawing this row
+
+			bit0 := spriteByte & 0x10
+			if bit0 == 1 {
+				//If the current pixel in the sprite row is on and the pixel at coordinates X,Y on the screen is also on, turn off the pixel and set VF to 1
+				index := GetScreenIndexFromCoords(int(xcoord+0), int(ycoord))
+				if c.Gfx[index] == 1 {
+					c.Gfx[index] = 0
+					c.V[0x0F] = 1
+
+					//Or if the current pixel in the sprite row is on and the screen pixel is not, draw the pixel at the X and Y coordinates
+				} else {
+					c.Gfx[index] = 1
+				}
+
+			}
+
+			// Increment X (VX is not incremented)
+			// Increment Y (VY is not incremented)
+			//  Stop if you reach the bottom edge of the screen
+
+		}
+
+	case 0xE0:
+		switch N {
+		case 0x01:
+			//EXA1 skip one instruction if the key matching VX is not pressed at this moment
+			keyVal := c.Key[c.V[X]]
+
+			if keyVal == 0x00 {
+				c.Pc += 0x02
+			}
+
+		case 0x0E:
+			//EX9E skip one instruction if the key matching VX *IS* pressed at this moment
+			keyVal := c.Key[c.V[X]]
+
+			if keyVal == 0x01 {
+				c.Pc += 0x02
+			}
+
+		}
+	case 0xF0:
+		switch N {
+		case 0x03:
+			//FX33 binary-coded decimal conversion
+
+			//take the number in VX, which is any from 0 - 255 (0x00 - 0xFF)
+			//convert like this
+			//if VX = 156 (0x9C) put 1 at c.I, 5 at c.I+1, and 6 at c.I+2
+
+			//ok augh bear with me here....
+			number := c.V[X]
+
+			one := number / 100
+			number = number - one*100
+
+			two := number / 10
+			number = number - two*10
+
+			three := number
+
+			c.Memory[c.I] = one
+			c.Memory[c.I+0x01] = two
+			c.Memory[c.I+0x01] = three
+			//right?
+
+		case 0x05:
+			switch Y {
+			case 0x01:
+				//FX15 set delay timer to value of VX
+				c.DelayTimer = c.V[X]
+
+			case 0x05:
+				//FX55 store reg to memory
+				index := c.I
+				for i := uint8(0); i < c.V[X]; i++ {
+					c.Memory[index] = c.V[i]
+					index++
+				}
+
+			case 0x06:
+				//FX65 load regs from memory
+				index := c.I
+				for i := uint8(0); i < c.V[X]; i++ {
+					c.V[i] = c.Memory[index]
+					index++
+				}
+
+			}
+
+		case 0x07:
+			//FX07 set VX to value of delay timer
+			c.V[X] = c.DelayTimer
+
+		case 0x08:
+			//FX18 sets sound timer to value of VX
+			c.SoundTimer = c.V[X]
+
+		case 0x09:
+			//FX29 font char
+
+			c.I = uint16(c.V[X])
+
+		case 0x0A:
+			//FX0A get key
+			blocking := true
+			key := uint8(0x00)
+			for blocking {
+				for i := 0; i < 16; i++ {
+					val := c.Key[i]
+					if val == 1 {
+						key = val
+						blocking = false
+						break
+					}
+				}
+			}
+			c.V[X] = key
+
+		case 0x0E:
+			//FX1E Add to index, overflow flag set if result is
+			//greater than 0x0FFF, which is outside normal memory range
+
+			setFlag := false
+			if (c.I + uint16(c.V[X])) > 0x0FFF {
+				setFlag = true
+			}
+
+			c.I = c.I + uint16(c.V[X])
+
+			if setFlag {
+				c.V[0x0F] = 1
+			}
+
+		}
 	}
+
 	// Execute Opcode
 
 	// Update timers
@@ -277,7 +499,6 @@ func (c *Chip8) Pop() uint16 {
 
 func (c *Chip8) Init() {
 	c.Pc = 0x200 // Program counter starts at 0x200
-	c.Opcode = 0 // Reset current opcode
 	c.I = 0      // Reset index register
 	c.Sp = 0     // Reset stack pointer
 
@@ -300,11 +521,41 @@ func (c *Chip8) Init() {
 	}
 
 	// Load fontset
-	for i := 0; i < 80; i++ {
+	for i := 0; i < 5*16; i++ {
 		c.Memory[i] = Fontset[i]
 	}
 
 	// Reset timers
 	c.DelayTimer = 0
 	c.SoundTimer = 0
+}
+
+func check(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func main() {
+	//testfilename := "test_opcode.ch8"
+	testfilename := "ibm.ch8"
+	dat, err := ioutil.ReadFile(testfilename)
+	check(err)
+
+	var cpu Chip8
+	cpu.Init()
+
+	for i := 0; i < len(dat); i++ {
+		offset := i + 0x200
+		cpu.Memory[offset] = dat[i]
+	}
+
+	fmt.Println("booop")
+
+	for true {
+		cpu.EmulateCycle()
+	}
+
+	//copy to memory
+
 }
