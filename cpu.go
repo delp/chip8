@@ -6,6 +6,10 @@ import (
 	"math"
 	"math/rand"
 	"time"
+
+	"github.com/faiface/pixel"
+	"github.com/faiface/pixel/pixelgl"
+	"golang.org/x/image/colornames"
 )
 
 var Fontset = []uint8{
@@ -557,13 +561,48 @@ func check(err error) {
 	}
 }
 
+func run() {
+	cfg := pixelgl.WindowConfig{
+		Title:  "CHIP-8!",
+		Bounds: pixel.R(0, 0, 1024/2, 768/2),
+		VSync:  true,
+	}
+	win, err := pixelgl.NewWindow(cfg)
+	if err != nil {
+		panic(err)
+	}
+
+	win.SetComposeMethod(pixel.ComposePlus)
+
+	canvas := pixelgl.NewCanvas(pixel.R(0, 0, 64, 32))
+	for !win.Closed() {
+		win.Clear(colornames.Black)
+
+		cpu.EmulateCycle()
+
+		converted := ConvertGfxToRGBA(cpu.Gfx[:])
+
+		canvas.SetPixels(converted)
+		//canvas.Draw(win, pixel.IM)
+		canvas.Draw(win, pixel.IM.Moved(pixel.V(100, 200)))
+		win.Update()
+		fmt.Println("GFX")
+		fmt.Println(cpu.Gfx)
+		fmt.Println("converted")
+		fmt.Println(converted)
+	}
+}
+
+var cpu Chip8
+
 func main() {
+
 	//testfilename := "test_opcode.ch8"
 	testfilename := "ibm.ch8"
+	//testfilename := "space.ch8"
 	dat, err := ioutil.ReadFile(testfilename)
 	check(err)
 
-	var cpu Chip8
 	cpu.Init()
 
 	for i := 0; i < len(dat); i++ {
@@ -573,8 +612,17 @@ func main() {
 
 	fmt.Println("booop")
 
-	for true {
-		cpu.EmulateCycle()
-	}
+	pixelgl.Run(run)
+}
 
+func ConvertGfxToRGBA(gfx []uint8) []uint8 {
+	pix := make([]uint8, 2048*4)
+
+	for i := 0; i < 2048*4; i += 4 {
+		pix[i] = 0
+		pix[i+1] = gfx[i/4] * 255
+		pix[i+2] = 0
+		pix[i+3] = 255
+	}
+	return pix
 }
