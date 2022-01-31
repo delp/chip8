@@ -574,22 +574,35 @@ func run() {
 
 	win.SetComposeMethod(pixel.ComposePlus)
 
+	fmt.Println(cpu.Pc)
 	canvas := pixelgl.NewCanvas(pixel.R(0, 0, 64, 32))
+	continuousMode := false
 	for !win.Closed() {
 		win.Clear(colornames.Black)
 
-		cpu.EmulateCycle()
+		if win.JustPressed(pixelgl.KeyC) {
+			continuousMode = !continuousMode
+		}
+
+		if continuousMode {
+			cpu.EmulateCycle()
+			fmt.Println(cpu.Pc)
+		}
+
+		if win.JustPressed(pixelgl.KeyQ) {
+			break
+		}
+		if !continuousMode && win.JustPressed(pixelgl.KeyEnter) {
+			cpu.EmulateCycle()
+			fmt.Println(cpu.Pc)
+		}
 
 		converted := ConvertGfxToRGBA(cpu.Gfx[:])
 
 		canvas.SetPixels(converted)
 		//canvas.Draw(win, pixel.IM)
-		canvas.Draw(win, pixel.IM.Moved(pixel.V(100, 200)))
+		canvas.Draw(win, pixel.IM.Moved(pixel.V(100, 300)).Scaled(pixel.V(100, 300), 3))
 		win.Update()
-		fmt.Println("GFX")
-		fmt.Println(cpu.Gfx)
-		fmt.Println("converted")
-		fmt.Println(converted)
 	}
 }
 
