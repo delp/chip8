@@ -64,6 +64,22 @@ func GetScreenIndexFromCoords(x int, y int) int {
 	return (x - 1) + (y-1)*64
 }
 
+func (c *Chip8) Print() {
+	fmt.Printf("PC: 0x%X   I: 0x%X\n", c.Pc, c.I)
+	fmt.Printf("V: %X %X %X %X   %X %X %X %X\n"+
+		"   %X %X %X %X   %X %X %X %X\n",
+		c.V[0], c.V[1], c.V[2], c.V[3],
+		c.V[4], c.V[5], c.V[6], c.V[7],
+		c.V[8], c.V[9], c.V[10], c.V[11],
+		c.V[12], c.V[13], c.V[14], c.V[15])
+
+	/*
+		    stack
+			stack pointer
+			current opcode
+	*/
+}
+
 func (c *Chip8) EmulateCycle() {
 
 	// Fetch Opcode
@@ -74,6 +90,7 @@ func (c *Chip8) EmulateCycle() {
 	a := uint16(code1)
 	a = a << 8
 	opcode := a + uint16(code2)
+	fmt.Printf("Opcode: 0x%X\n\n", opcode)
 
 	// Increment PC
 	c.Pc += 0x02
@@ -92,7 +109,7 @@ func (c *Chip8) EmulateCycle() {
 	//nib1
 	foo := opcode & 0xF000
 	foo = foo >> 8
-	nib1 := uint8(foo)
+	prefix := uint8(foo)
 
 	//X
 	foo = opcode & 0x0F00
@@ -108,7 +125,7 @@ func (c *Chip8) EmulateCycle() {
 	NN := uint8(opcode & 0x00FF)
 	NNN := opcode & 0x0FFF
 
-	switch nib1 {
+	switch prefix { //TODO these are technically wrong and nib1 should be 0xX instead of 0xX0, but whatever
 	case 0x00:
 		if NN == 0xE0 {
 			//0x00E0 clear screen
@@ -337,7 +354,8 @@ func (c *Chip8) EmulateCycle() {
 		//For N rows:
 		for i := uint16(0x00); i < N; i++ {
 			//Get the Nth byte of sprite data, counting from the memory address in the I register (I is not incremented)
-			spriteByte := c.Memory[c.I+N]
+			spriteByte := c.Memory[c.I+i]
+			fmt.Printf("drawing sprite %X at %d, %d\n", spriteByte, xcoord, ycoord)
 
 			//For each of the 8 pixels/bits in this sprite row:
 			//TODO  //If you reach the right edge of the screen, stop drawing this row
@@ -362,7 +380,7 @@ func (c *Chip8) EmulateCycle() {
 				bit := spriteByte & mask
 				if bit > 0 {
 					//If the current pixel in the sprite row is on and the pixel at coordinates X,Y on the screen is also on, turn off the pixel and set VF to 1
-					index := GetScreenIndexFromCoords(int(xcoord+uint8(j)), int(ycoord))
+					index := GetScreenIndexFromCoords(int(xcoord+uint8(j)), int(ycoord+uint8(i)))
 					if c.Gfx[index] == 1 {
 						c.Gfx[index] = 0
 						c.V[0x0F] = 1
@@ -373,13 +391,15 @@ func (c *Chip8) EmulateCycle() {
 					} else {
 						c.Gfx[index] = 1
 					}
-
 					// Increment X (VX is not incremented)
-
 				}
+				//ycoord++
+				//if ycoord >= 32 {
+				//	break
+				//}
+				// Increment Y (VY is not incremented)
+				// Stop if you reach the bottom edge of the screen
 			}
-			// Increment Y (VY is not incremented)
-			// Stop if you reach the bottom edge of the screen
 
 		}
 
@@ -522,6 +542,14 @@ func (c *Chip8) Pop() uint16 {
 	return a
 }
 
+func (c *Chip8) LoadRom(data []byte, offset uint16) {
+	for i := 0; i < len(data); i++ {
+		a := i + int(offset)
+		cpu.Memory[a] = data[i]
+	}
+
+}
+
 func (c *Chip8) Init() {
 	c.Pc = 0x200 // Program counter starts at 0x200
 	c.I = 0      // Reset index register
@@ -574,7 +602,7 @@ func run() {
 
 	win.SetComposeMethod(pixel.ComposePlus)
 
-	fmt.Println(cpu.Pc)
+	cpu.Print()
 	canvas := pixelgl.NewCanvas(pixel.R(0, 0, 64, 32))
 	continuousMode := false
 	for !win.Closed() {
@@ -586,7 +614,11 @@ func run() {
 
 		if continuousMode {
 			cpu.EmulateCycle()
-			fmt.Println(cpu.Pc)
+			cpu.Print()
+		}
+
+		if win.JustPressed(pixelgl.KeyR) {
+			cpu.Init()
 		}
 
 		if win.JustPressed(pixelgl.KeyQ) {
@@ -594,14 +626,13 @@ func run() {
 		}
 		if !continuousMode && win.JustPressed(pixelgl.KeyEnter) {
 			cpu.EmulateCycle()
-			fmt.Println(cpu.Pc)
+			cpu.Print()
 		}
 
 		converted := ConvertGfxToRGBA(cpu.Gfx[:])
 
 		canvas.SetPixels(converted)
-		//canvas.Draw(win, pixel.IM)
-		canvas.Draw(win, pixel.IM.Moved(pixel.V(100, 300)).Scaled(pixel.V(100, 300), 3))
+		canvas.Draw(win, pixel.IM.Moved(pixel.V(120, 300)).Scaled(pixel.V(120, 300), 4))
 		win.Update()
 	}
 }
@@ -617,11 +648,7 @@ func main() {
 	check(err)
 
 	cpu.Init()
-
-	for i := 0; i < len(dat); i++ {
-		offset := i + 0x200
-		cpu.Memory[offset] = dat[i]
-	}
+	cpu.LoadRom(dat, 0x200)
 
 	fmt.Println("booop")
 
