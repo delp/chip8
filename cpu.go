@@ -407,10 +407,13 @@ func (c *Chip8) EmulateCycle() {
 		switch N {
 		case 0x01:
 			//EXA1 skip one instruction if the key matching VX is not pressed at this moment
-			keyVal := c.Key[c.V[X]]
+			foo := c.V[X]
+			if foo >= 0 && foo <= 0xf {
+				keyVal := c.Key[foo]
 
-			if keyVal == 0x00 {
-				c.Pc += 0x02
+				if keyVal == 0x00 {
+					c.Pc += 0x02
+				}
 			}
 
 		case 0x0E:
@@ -457,6 +460,9 @@ func (c *Chip8) EmulateCycle() {
 				//FX55 store reg to memory
 				index := c.I
 				for i := uint8(0); i < c.V[X]; i++ {
+					if i > 0xf {
+						break
+					}
 					c.Memory[index] = c.V[i]
 					index++
 				}
@@ -465,6 +471,9 @@ func (c *Chip8) EmulateCycle() {
 				//FX65 load regs from memory
 				index := c.I
 				for i := uint8(0); i < c.V[X]; i++ {
+					if i > 0x0f {
+						break
+					}
 					c.V[i] = c.Memory[index]
 					index++
 				}
@@ -592,7 +601,7 @@ func check(err error) {
 func run() {
 	cfg := pixelgl.WindowConfig{
 		Title:  "CHIP-8!",
-		Bounds: pixel.R(0, 0, 1024/2, 768/2),
+		Bounds: pixel.R(0, 0, 1200/2, 768/2),
 		VSync:  true,
 	}
 	win, err := pixelgl.NewWindow(cfg)
@@ -632,7 +641,8 @@ func run() {
 		converted := ConvertGfxToRGBA(cpu.Gfx[:])
 
 		canvas.SetPixels(converted)
-		canvas.Draw(win, pixel.IM.Moved(pixel.V(120, 300)).Scaled(pixel.V(120, 300), 4))
+		canvas.Draw(win, pixel.IM.Moved(pixel.V(280, 200)).Scaled(pixel.V(280, 200), 8))
+		//canvas.Draw(win, pixel.IM)
 		win.Update()
 	}
 }
@@ -642,8 +652,8 @@ var cpu Chip8
 func main() {
 
 	//testfilename := "test_opcode.ch8"
-	testfilename := "ibm.ch8"
-	//testfilename := "space.ch8"
+	//testfilename := "ibm.ch8"
+	testfilename := "space.ch8"
 	dat, err := ioutil.ReadFile(testfilename)
 	check(err)
 
