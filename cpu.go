@@ -31,6 +31,8 @@ var Fontset = []uint8{
 	0xF0, 0x80, 0xF0, 0x80, 0x80, //F
 }
 
+var printToConsole bool
+
 type Chip8 struct {
 	Stack [16]uint16
 	Sp    uint8 //Stack Pointer
@@ -98,7 +100,6 @@ func (c *Chip8) EmulateCycle() {
 	// Decode Opcode
 
 	/*
-
 	   "X: The second nibble. Used to look up one of the 16 registers (VX) from V0 through VF.
 	    Y: The third nibble. Also used to look up one of the 16 registers (VY) from V0 through VF.
 	    N: The fourth nibble. A 4-bit number.
@@ -534,7 +535,7 @@ func (c *Chip8) EmulateCycle() {
 	//TODO display update is 60Hz
 }
 
-//TODO validate this w tests
+// TODO validate this w tests
 func (c *Chip8) Push(a uint16) {
 	if c.Sp < 0x0F {
 		c.Sp++
@@ -542,7 +543,7 @@ func (c *Chip8) Push(a uint16) {
 	}
 }
 
-//TODO validate this w tests
+// TODO validate this w tests
 func (c *Chip8) Pop() uint16 {
 	a := c.Stack[c.Sp]
 	if c.Sp > 0 {
@@ -621,6 +622,10 @@ func run() {
 			continuousMode = !continuousMode
 		}
 
+		if win.JustPressed(pixelgl.KeyP) {
+			printToConsole = !printToConsole
+		}
+
 		if continuousMode {
 			cpu.EmulateCycle()
 			cpu.Print()
@@ -639,10 +644,11 @@ func run() {
 		}
 
 		converted := ConvertGfxToRGBA(cpu.Gfx[:])
-
+		if printToConsole {
+			printGFXMem(cpu)
+		}
 		canvas.SetPixels(converted)
 		canvas.Draw(win, pixel.IM.Moved(pixel.V(280, 200)).Scaled(pixel.V(280, 200), 8))
-		//canvas.Draw(win, pixel.IM)
 		win.Update()
 	}
 }
@@ -668,11 +674,40 @@ func main() {
 func ConvertGfxToRGBA(gfx []uint8) []uint8 {
 	pix := make([]uint8, 2048*4)
 
+	//GFX origin is top left but SetPixels expects the origin to be bottom left
+	//So we have to reorder the lines in the gfx buffer or it will draw with a vertical mirroring
+	var newBuffer []uint8
+
+	for row := 31; row >= 0; row-- {
+		//indices
+		a := row * 64
+		b := a + 64
+		line := gfx[a:b]
+		newBuffer = append(newBuffer, line...)
+	}
+
 	for i := 0; i < 2048*4; i += 4 {
 		pix[i] = 0
-		pix[i+1] = gfx[i/4] * 255
+		pix[i+1] = newBuffer[i/4] * 255
 		pix[i+2] = 0
 		pix[i+3] = 255
 	}
+
 	return pix
+}
+
+func printGFXMem(c Chip8) {
+	//64 by 32
+	for y := 0; y < 32; y++ {
+		for x := 0; x < 64; x++ {
+			piss := c.Gfx[x+y*64]
+			if piss == 1 {
+				fmt.Printf("X")
+			} else {
+				fmt.Printf(" ")
+			}
+		}
+		fmt.Println()
+	}
+	fmt.Println()
 }
