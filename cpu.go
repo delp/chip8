@@ -32,6 +32,7 @@ var Fontset = []uint8{
 }
 
 var printToConsole bool
+var continuousMode bool
 
 type Chip8 struct {
 	Stack [16]uint16
@@ -92,7 +93,9 @@ func (c *Chip8) EmulateCycle() {
 	a := uint16(code1)
 	a = a << 8
 	opcode := a + uint16(code2)
-	fmt.Printf("Opcode: 0x%X\n\n", opcode)
+	if printToConsole {
+		fmt.Printf("Opcode: 0x%X\n\n", opcode)
+	}
 
 	// Increment PC
 	c.Pc += 0x02
@@ -356,8 +359,9 @@ func (c *Chip8) EmulateCycle() {
 		for i := uint16(0x00); i < N; i++ {
 			//Get the Nth byte of sprite data, counting from the memory address in the I register (I is not incremented)
 			spriteByte := c.Memory[c.I+i]
-			fmt.Printf("drawing sprite %X at %d, %d\n", spriteByte, xcoord, ycoord)
-
+			if printToConsole {
+				fmt.Printf("drawing sprite %X at %d, %d\n", spriteByte, xcoord, ycoord)
+			}
 			//For each of the 8 pixels/bits in this sprite row:
 			//TODO  //If you reach the right edge of the screen, stop drawing this row
 
@@ -448,8 +452,7 @@ func (c *Chip8) EmulateCycle() {
 
 			c.Memory[c.I] = one
 			c.Memory[c.I+0x01] = two
-			c.Memory[c.I+0x01] = three
-			//right?
+			c.Memory[c.I+0x02] = three
 
 		case 0x05:
 			switch Y {
@@ -460,23 +463,21 @@ func (c *Chip8) EmulateCycle() {
 			case 0x05:
 				//FX55 store reg to memory
 				index := c.I
-				for i := uint8(0); i < c.V[X]; i++ {
+				for i := uint8(0); i <= X; i++ {
 					if i > 0xf {
 						break
 					}
-					c.Memory[index] = c.V[i]
-					index++
+					c.Memory[index+uint16(i)] = c.V[i]
 				}
 
 			case 0x06:
 				//FX65 load regs from memory
 				index := c.I
-				for i := uint8(0); i < c.V[X]; i++ {
+				for i := uint8(0); i <= X; i++ {
 					if i > 0x0f {
 						break
 					}
-					c.V[i] = c.Memory[index]
-					index++
+					c.V[i] = c.Memory[index+uint16(i)]
 				}
 
 			}
@@ -612,9 +613,10 @@ func run() {
 
 	win.SetComposeMethod(pixel.ComposePlus)
 
-	cpu.Print()
+	if printToConsole {
+		cpu.Print()
+	}
 	canvas := pixelgl.NewCanvas(pixel.R(0, 0, 64, 32))
-	continuousMode := false
 	for !win.Closed() {
 		win.Clear(colornames.Black)
 
@@ -628,7 +630,9 @@ func run() {
 
 		if continuousMode {
 			cpu.EmulateCycle()
-			cpu.Print()
+			if printToConsole {
+				cpu.Print()
+			}
 		}
 
 		if win.JustPressed(pixelgl.KeyR) {
@@ -640,7 +644,9 @@ func run() {
 		}
 		if !continuousMode && win.JustPressed(pixelgl.KeyEnter) {
 			cpu.EmulateCycle()
-			cpu.Print()
+			if printToConsole {
+				cpu.Print()
+			}
 		}
 
 		converted := ConvertGfxToRGBA(cpu.Gfx[:])
@@ -665,8 +671,6 @@ func main() {
 
 	cpu.Init()
 	cpu.LoadRom(dat, 0x200)
-
-	fmt.Println("booop")
 
 	pixelgl.Run(run)
 }
@@ -697,11 +701,9 @@ func ConvertGfxToRGBA(gfx []uint8) []uint8 {
 }
 
 func printGFXMem(c Chip8) {
-	//64 by 32
 	for y := 0; y < 32; y++ {
 		for x := 0; x < 64; x++ {
-			piss := c.Gfx[x+y*64]
-			if piss == 1 {
+			if c.Gfx[x+y*64] == 1 {
 				fmt.Printf("X")
 			} else {
 				fmt.Printf(" ")
