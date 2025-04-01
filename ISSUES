@@ -1,0 +1,11 @@
+
+* Get rid of all the magic numbers involved in screen/canvas math
+  Here's how to do it: add keys for adjusting the move and scaling vectors until things look correct.
+* Add keypad inputs
+* Calculate a correct framerate to run at (cycles per second, cycles per frame, frames per second)
+* Profile performance, figure out which of your horrible loops is causing stuff to be so slow with vsync on?
+  Or...is that even related? or needed?
+* Fix compatability with flags test rom
+* Add a memory monitor in a nice window
+* Write an assembler/disassembler
+* Update to Pixel2

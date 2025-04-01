@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"math"
 	"math/rand"
+	"os"
 	"time"
 
 	"github.com/faiface/pixel"
@@ -32,6 +33,7 @@ var Fontset = []uint8{
 }
 
 var printToConsole bool
+var printOpCode bool
 var continuousMode bool
 
 type Chip8 struct {
@@ -53,20 +55,7 @@ type Chip8 struct {
 	Key [16]uint8 //Memory Mapped Keyboard
 }
 
-func GetCoordsFromScreenIndex(i int) (int, int) {
-
-	y := (i / 64) + 1
-
-	x := i - ((y - 1) * 64)
-	x++
-
-	return x, y
-}
-
-func GetScreenIndexFromCoords(x int, y int) int {
-	return (x - 1) + (y-1)*64
-}
-
+// Print prints the current CPU state to the terminal.
 func (c *Chip8) Print() {
 	fmt.Printf("PC: 0x%X   I: 0x%X\n", c.Pc, c.I)
 	fmt.Printf("V: %X %X %X %X   %X %X %X %X\n"+
@@ -75,12 +64,6 @@ func (c *Chip8) Print() {
 		c.V[4], c.V[5], c.V[6], c.V[7],
 		c.V[8], c.V[9], c.V[10], c.V[11],
 		c.V[12], c.V[13], c.V[14], c.V[15])
-
-	/*
-		    stack
-			stack pointer
-			current opcode
-	*/
 }
 
 func (c *Chip8) EmulateCycle() {
@@ -93,8 +76,8 @@ func (c *Chip8) EmulateCycle() {
 	a := uint16(code1)
 	a = a << 8
 	opcode := a + uint16(code2)
-	if printToConsole {
-		fmt.Printf("Opcode: 0x%X\n\n", opcode)
+	if printOpCode {
+		fmt.Printf("Opcode: 0x%X\n", opcode)
 	}
 
 	// Increment PC
@@ -208,6 +191,8 @@ func (c *Chip8) EmulateCycle() {
 
 			//check overflow
 			overflow := false
+			doo := c.V[X] + c.V[Y]
+			fmt.Println(doo)
 			if (c.V[X] + c.V[Y]) > 0xFF {
 				overflow = true
 			}
@@ -594,6 +579,65 @@ func (c *Chip8) Init() {
 	c.SoundTimer = 0
 }
 
+func ConvertGfxToRGBA(gfx []uint8) []uint8 {
+	pix := make([]uint8, 2048*4)
+
+	//GFX origin is top left but SetPixels expects the origin to be bottom left
+	//So we have to reorder the lines in the gfx buffer or it will draw with a vertical mirroring
+	var newBuffer []uint8
+
+	for row := 31; row >= 0; row-- {
+		//indices
+		a := row * 64
+		b := a + 64
+		line := gfx[a:b]
+		newBuffer = append(newBuffer, line...)
+	}
+
+	for i := 0; i < 2048*4; i += 4 {
+		pix[i] = 0
+		pix[i+1] = newBuffer[i/4] * 255
+		pix[i+2] = 0
+		pix[i+3] = 255
+	}
+
+	return pix
+}
+
+func GetCoordsFromScreenIndex(i int) (int, int) {
+	y := (i / 64) + 1
+	x := i - ((y - 1) * 64)
+	x++
+	return x, y
+}
+
+func GetScreenIndexFromCoords(x int, y int) int {
+	x--
+	y--
+	if x < 0 {
+		x = 0
+	}
+	if y < 0 {
+		y = 0
+	}
+
+	return (x) + (y)*64
+}
+
+func PrintGfxMem(c Chip8) {
+	for y := 0; y < 32; y++ {
+		for x := 0; x < 64; x++ {
+			if c.Gfx[x+y*64] == 1 {
+				fmt.Printf("X")
+			} else {
+				fmt.Printf(" ")
+			}
+		}
+		fmt.Println()
+	}
+	fmt.Println()
+}
+
 func check(err error) {
 	if err != nil {
 		panic(err)
@@ -602,9 +646,11 @@ func check(err error) {
 
 func run() {
 	cfg := pixelgl.WindowConfig{
-		Title:  "CHIP-8!",
-		Bounds: pixel.R(0, 0, 1200/2, 768/2),
-		VSync:  true,
+		Title: "CHIP-8!",
+		// Bounds: pixel.R(0, 0, 1200/2, 768/2),
+		//TODO get rid of all these magic numbers lmao
+		Bounds: pixel.R(0, 0, 64*8+16, 32*8+16),
+		VSync:  false,
 	}
 	win, err := pixelgl.NewWindow(cfg)
 	if err != nil {
@@ -651,11 +697,15 @@ func run() {
 
 		converted := ConvertGfxToRGBA(cpu.Gfx[:])
 		if printToConsole {
-			printGFXMem(cpu)
+			PrintGfxMem(cpu)
 		}
 		canvas.SetPixels(converted)
-		canvas.Draw(win, pixel.IM.Moved(pixel.V(280, 200)).Scaled(pixel.V(280, 200), 8))
+		xvec := (64 * 8) / 2.0
+		yvec := (32 * 8) / 2.0
+		//TODO magic numbers
+		canvas.Draw(win, pixel.IM.Moved(pixel.V(xvec+10, yvec)).Scaled(pixel.V(xvec+10, yvec), 8))
 		win.Update()
+		time.Sleep(1200 * time.Microsecond)
 	}
 }
 
@@ -663,9 +713,15 @@ var cpu Chip8
 
 func main() {
 
-	//testfilename := "test_opcode.ch8"
-	//testfilename := "ibm.ch8"
-	testfilename := "space.ch8"
+	var testfilename string
+
+	printOpCode = true
+
+	if len(os.Args) == 2 {
+		testfilename = os.Args[1]
+	} else {
+		testfilename = "space.ch8"
+	}
 	dat, err := ioutil.ReadFile(testfilename)
 	check(err)
 
@@ -673,43 +729,4 @@ func main() {
 	cpu.LoadRom(dat, 0x200)
 
 	pixelgl.Run(run)
-}
-
-func ConvertGfxToRGBA(gfx []uint8) []uint8 {
-	pix := make([]uint8, 2048*4)
-
-	//GFX origin is top left but SetPixels expects the origin to be bottom left
-	//So we have to reorder the lines in the gfx buffer or it will draw with a vertical mirroring
-	var newBuffer []uint8
-
-	for row := 31; row >= 0; row-- {
-		//indices
-		a := row * 64
-		b := a + 64
-		line := gfx[a:b]
-		newBuffer = append(newBuffer, line...)
-	}
-
-	for i := 0; i < 2048*4; i += 4 {
-		pix[i] = 0
-		pix[i+1] = newBuffer[i/4] * 255
-		pix[i+2] = 0
-		pix[i+3] = 255
-	}
-
-	return pix
-}
-
-func printGFXMem(c Chip8) {
-	for y := 0; y < 32; y++ {
-		for x := 0; x < 64; x++ {
-			if c.Gfx[x+y*64] == 1 {
-				fmt.Printf("X")
-			} else {
-				fmt.Printf(" ")
-			}
-		}
-		fmt.Println()
-	}
-	fmt.Println()
 }
