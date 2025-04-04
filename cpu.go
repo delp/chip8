@@ -187,12 +187,10 @@ func (c *Chip8) EmulateCycle() {
 
 		case 0x04:
 			//8XY4 vx = vx + vy
-			//NOTE there's a cary this time
+			//NOTE there's a carry this time
 
 			//check overflow
 			overflow := false
-			doo := c.V[X] + c.V[Y]
-			fmt.Println(doo)
 			if (c.V[X] + c.V[Y]) > 0xFF {
 				overflow = true
 			}
@@ -202,7 +200,9 @@ func (c *Chip8) EmulateCycle() {
 
 			//update VF
 			if overflow {
-				c.V[0x0F] = 1
+				c.V[0x0F] = 0x01
+			} else {
+				c.V[0x0F] = 0x00
 			}
 
 			/*
@@ -226,6 +226,7 @@ func (c *Chip8) EmulateCycle() {
 		case 0x05:
 			//8XY5 sets VX = VX - VY
 			overflow := false
+
 			if c.V[X] > c.V[Y] {
 				overflow = true
 			}
