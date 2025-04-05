@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math"
 	"math/rand"
 	"os"
@@ -724,7 +723,7 @@ func main() {
 	} else {
 		testfilename = "space.ch8"
 	}
-	dat, err := ioutil.ReadFile(testfilename)
+	dat, err := os.ReadFile(testfilename)
 	check(err)
 
 	cpu.Init()
