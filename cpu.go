@@ -8,8 +8,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/faiface/pixel"
-	"github.com/faiface/pixel/pixelgl"
+	"github.com/gopxl/pixel/v2"
+	pixelgl "github.com/gopxl/pixel/v2/backends/opengl"
 	"golang.org/x/image/colornames"
 )
 
@@ -667,11 +667,12 @@ func run() {
 	for !win.Closed() {
 		win.Clear(colornames.Black)
 
-		if win.JustPressed(pixelgl.KeyC) {
+		//if win.JustPressed(pixelgl.KeyC) {
+		if win.JustPressed(pixel.KeyC) {
 			continuousMode = !continuousMode
 		}
 
-		if win.JustPressed(pixelgl.KeyP) {
+		if win.JustPressed(pixel.KeyP) {
 			printToConsole = !printToConsole
 		}
 
@@ -682,14 +683,14 @@ func run() {
 			}
 		}
 
-		if win.JustPressed(pixelgl.KeyR) {
+		if win.JustPressed(pixel.KeyR) {
 			cpu.Init()
 		}
 
-		if win.JustPressed(pixelgl.KeyQ) {
+		if win.JustPressed(pixel.KeyQ) {
 			break
 		}
-		if !continuousMode && win.JustPressed(pixelgl.KeyEnter) {
+		if !continuousMode && win.JustPressed(pixel.KeyEnter) {
 			cpu.EmulateCycle()
 			if printToConsole {
 				cpu.Print()
