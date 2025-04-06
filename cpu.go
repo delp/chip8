@@ -224,67 +224,38 @@ func (c *Chip8) EmulateCycle() {
 
 		case 0x05:
 			//8XY5 sets VX = VX - VY
-			overflow := false
 
-			if c.V[X] > c.V[Y] {
-				overflow = true
-			}
-
-			underflow := false
+			borrow := false
 			if c.V[Y] > c.V[X] {
-				underflow = true
+				borrow = true
 			}
 
 			c.V[X] = c.V[X] - c.V[Y]
 
-			if overflow {
-				c.V[0xF] = 1
-			}
-			if underflow {
+			if borrow {
 				c.V[0xF] = 0
+			} else {
+				c.V[0xF] = 1
 			}
 
 		case 0x07:
 			//8XY5 sets VX = *VY* - VX
 
-			overflow := false
-			if c.V[Y] > c.V[X] {
-				overflow = true
-			}
-
-			underflow := false
-			if c.V[X] > c.V[Y] {
-				underflow = true
-			}
-
 			c.V[X] = c.V[Y] - c.V[X]
 
-			if overflow {
-				c.V[0xF] = 1
-			}
-			if underflow {
-				c.V[0xF] = 0
+			if c.V[X] > c.V[Y] {
+				c.V[0xF] = 0x0
+			} else {
+				c.V[0xF] = 0x1
 			}
 
-			/*
-				Step by step:
-				(Optional, or configurable) Set VX to the value of VY
-				Shift the value of VX one bit to the right (8XY6) or left (8XYE)
-				Set VF to 1 if the bit that was shifted out was 1, or 0 if it was 0
-			*/
+			// c.V[X] = c.V[Y] - c.V[X]
+
 		case 0x06:
 			//8XY6 shift right
-			c.V[X] = c.V[Y]
 
-			foo := c.V[X] & 0x01
-
+			c.V[0xF] = c.V[X] & 0x01
 			c.V[X] = c.V[X] >> 1
-
-			if foo == 0x01 {
-				c.V[0x0F] = 1
-			} else {
-				c.V[0x0F] = 0
-			}
 
 		case 0x0E:
 			//8XYE shift left
@@ -325,6 +296,8 @@ func (c *Chip8) EmulateCycle() {
 		s1 := rand.NewSource(time.Now().UnixNano())
 		r1 := rand.New(s1)
 		random := uint8(r1.Intn(255))
+		fmt.Printf("random! %x\n", random)
+		fmt.Printf("V%d: %x & %x = %x\n", X, c.V[X], random, c.V[X]&random)
 		c.V[X] = c.V[X] & random
 
 	case 0xD0:
