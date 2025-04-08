@@ -32,6 +32,7 @@ var Fontset = []uint8{
 }
 
 var printToConsole bool
+var printSprites bool
 var printOpCode bool
 var continuousMode bool
 
@@ -63,6 +64,14 @@ func (c *Chip8) Print() {
 		c.V[4], c.V[5], c.V[6], c.V[7],
 		c.V[8], c.V[9], c.V[10], c.V[11],
 		c.V[12], c.V[13], c.V[14], c.V[15])
+}
+
+func (c *Chip8) PrintMem(upperBound int) {
+	for a, b := range c.Memory {
+		if a < upperBound {
+			fmt.Printf("%x, %x\n", a, b)
+		}
+	}
 }
 
 func (c *Chip8) EmulateCycle() {
@@ -317,7 +326,7 @@ func (c *Chip8) EmulateCycle() {
 		for i := uint16(0x00); i < N; i++ {
 			//Get the Nth byte of sprite data, counting from the memory address in the I register (I is not incremented)
 			spriteByte := c.Memory[c.I+i]
-			if printToConsole {
+			if printSprites {
 				fmt.Printf("drawing sprite %X at %d, %d\n", spriteByte, xcoord, ycoord)
 			}
 			//For each of the 8 pixels/bits in this sprite row:
@@ -648,6 +657,10 @@ func run() {
 			printToConsole = !printToConsole
 		}
 
+		if win.JustPressed(pixel.KeyM) {
+			cpu.PrintMem(1250)
+		}
+
 		if continuousMode {
 			cpu.EmulateCycle()
 			if printToConsole {
@@ -655,8 +668,9 @@ func run() {
 			}
 		}
 
+		//Reset Program Counter
 		if win.JustPressed(pixel.KeyR) {
-			cpu.Init()
+			cpu.Pc = 0x200
 		}
 
 		if win.JustPressed(pixel.KeyQ) {
@@ -690,6 +704,7 @@ func main() {
 	var testfilename string
 
 	printOpCode = true
+	printSprites = true
 
 	if len(os.Args) == 2 {
 		testfilename = os.Args[1]
