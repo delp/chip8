@@ -31,6 +31,7 @@ var Fontset = []uint8{
 	0xF0, 0x80, 0xF0, 0x80, 0x80, //F
 }
 
+// These are debug flags for development
 var printToConsole bool
 var printSprites bool
 var printOpCode bool
@@ -380,7 +381,7 @@ func (c *Chip8) EmulateCycle() {
 		case 0x01:
 			//EXA1 skip one instruction if the key matching VX is not pressed at this moment
 			foo := c.V[X]
-			if foo >= 0 && foo <= 0xf {
+			if foo <= 0xf {
 				keyVal := c.Key[foo]
 
 				if keyVal == 0x00 {
@@ -496,16 +497,11 @@ func (c *Chip8) EmulateCycle() {
 		}
 	}
 
-	// Execute Opcode
-
-	// Update timers
-
-	//TODO display update is 60Hz
 }
 
 // TODO validate this w tests
 func (c *Chip8) Push(a uint16) {
-	if c.Sp < 0x0F {
+	if c.Sp <= 0x0F {
 		c.Sp++
 		c.Stack[c.Sp] = a
 	}
@@ -594,8 +590,8 @@ func GetCoordsFromScreenIndex(i int) (int, int) {
 }
 
 func GetScreenIndexFromCoords(x int, y int) int {
-	x--
-	y--
+	// x--
+	// y--
 	if x < 0 {
 		x = 0
 	}
